@@ -1,11 +1,3 @@
-<<<<<<< HEAD
-import React, { useState } from 'react';
-import { Shield } from 'lucide-react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import Hero from './components/Hero';
-import WorkflowCarousel from './components/WorkflowCarousel';
-import UploadDataPage from './pages/UploadDataPage';
-=======
 import React, { useState, useEffect } from 'react';
 import { Shield, User, LogOut } from 'lucide-react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
@@ -14,7 +6,6 @@ import WorkflowCarousel from './components/WorkflowCarousel';
 import UploadDataPage from './pages/UploadDataPage';
 import AuthPage from './pages/AuthPage';
 import ProtectedRoute from './components/ProtectedRoute';
->>>>>>> d829c81d (first commit)
 import { AnalysisState, AnalysisResults } from './types';
 import Chatbot from "./components/Chatbot";
 
@@ -36,13 +27,6 @@ interface FlaggedUser {
   timestamp: string;
 }
 
-<<<<<<< HEAD
-function App() {
-  const BASE_URL = "https://df673b7d2566.ngrok-free.app";
-  const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [results, setResults] = useState<AnalysisResults | null>(null);
-=======
 interface User {
   _id: string;
   email: string;
@@ -154,7 +138,6 @@ function App() {
     setIsAuthenticated(false);
     setUser(null);
   };
->>>>>>> d829c81d (first commit)
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -184,11 +167,6 @@ function App() {
                 AnomalyGuard AI
               </span>
             </Link>
-<<<<<<< HEAD
-            <div className="hidden md:flex items-center space-x-8">
-              <Link to="/" className="text-gray-600 hover:text-teal-600 transition-colors">Home</Link>
-              <Link to="/upload" className="text-gray-600 hover:text-teal-600 transition-colors">Upload & Analyze</Link>
-=======
             <div className="flex items-center space-x-6">
               <div className="hidden md:flex items-center space-x-8">
                 <Link to="/" className="text-gray-600 hover:text-teal-600 transition-colors">Home</Link>
@@ -218,31 +196,19 @@ function App() {
                   Login
                 </Link>
               )}
->>>>>>> d829c81d (first commit)
             </div>
           </div>
         </nav>
 
         <Routes>
-<<<<<<< HEAD
-          {/* Home route */}
-          <Route path="/" element={
-            <>
-              <Hero scrollToSection={scrollToSection} />
-=======
           {/* Home route - accessible without auth */}
           <Route path="/" element={
             <>
               <Hero scrollToSection={scrollToSection} isAuthenticated={isAuthenticated} />
->>>>>>> d829c81d (first commit)
               <WorkflowCarousel />
             </>
           } />
 
-<<<<<<< HEAD
-          {/* Upload & Analyze pages */}
-          <Route path="/upload" element={<UploadDataPage />} />
-=======
           {/* Auth route */}
           <Route 
             path="/auth" 
@@ -267,7 +233,6 @@ function App() {
               </ProtectedRoute>
             } 
           />
->>>>>>> d829c81d (first commit)
         </Routes>
 
         {/* Chatbot receives results dynamically */}
@@ -329,8 +294,4 @@ function App() {
   );
 }
 
-<<<<<<< HEAD
 export default App;
-=======
-export default App;
->>>>>>> d829c81d (first commit)

@@ -1,9 +1,5 @@
 import React, { useRef, useState } from 'react';
-<<<<<<< HEAD
-import { Upload, File, CheckCircle, AlertCircle, Play } from 'lucide-react';
-=======
 import { Upload, File, CheckCircle, AlertCircle, Play, Loader2 } from 'lucide-react';
->>>>>>> d829c81d (first commit)
 import { AnalysisState } from '../types';
 
 interface UploadSectionProps {
@@ -11,22 +7,15 @@ interface UploadSectionProps {
   uploadedFile: File | null;
   analysisState: AnalysisState;
   onRunAnalysis: () => void;
-<<<<<<< HEAD
-=======
   errorMessage?: string | null;
->>>>>>> d829c81d (first commit)
 }
 
 const UploadSection: React.FC<UploadSectionProps> = ({
   onFileUpload,
   uploadedFile,
   analysisState,
-<<<<<<< HEAD
-  onRunAnalysis
-=======
   onRunAnalysis,
   errorMessage
->>>>>>> d829c81d (first commit)
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -85,20 +74,6 @@ const UploadSection: React.FC<UploadSectionProps> = ({
   return (
     <section id="upload" className="py-20 bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-4xl mx-auto px-6">
-<<<<<<< HEAD
-        <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-            Upload Your <span className="bg-gradient-to-r from-teal-600 to-blue-600 bg-clip-text text-transparent">
-              Login Data
-            </span>
-          </h2>
-          <p className="text-xl text-gray-600">
-            Upload your CSV or log files to start the anomaly detection process
-          </p>
-        </div>
-
-=======
->>>>>>> d829c81d (first commit)
         {/* Upload area */}
         <div className="mb-8">
           <div
@@ -122,9 +97,6 @@ const UploadSection: React.FC<UploadSectionProps> = ({
               className="hidden"
             />
 
-<<<<<<< HEAD
-            {uploadedFile ? (
-=======
             {analysisState === 'processing' ? (
               <div className="space-y-4">
                 <Loader2 className="w-16 h-16 text-blue-500 mx-auto animate-spin" />
@@ -134,7 +106,6 @@ const UploadSection: React.FC<UploadSectionProps> = ({
                 </div>
               </div>
             ) : uploadedFile ? (
->>>>>>> d829c81d (first commit)
               <div className="space-y-4">
                 <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
                 <div>
@@ -175,11 +146,7 @@ const UploadSection: React.FC<UploadSectionProps> = ({
         </div>
 
         {/* Run Analysis Button */}
-<<<<<<< HEAD
-        {uploadedFile && analysisState !== 'processing' && (
-=======
         {uploadedFile && analysisState !== 'processing' && analysisState !== 'completed' && (
->>>>>>> d829c81d (first commit)
           <div className="text-center">
             <button
               onClick={onRunAnalysis}
@@ -204,9 +171,6 @@ const UploadSection: React.FC<UploadSectionProps> = ({
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-red-700 mb-2">Analysis Failed</h3>
             <p className="text-red-600">
-<<<<<<< HEAD
-              There was an error processing your file. Please try again or contact support.
-=======
               {errorMessage || 'There was an error processing your file. Please try again or contact support.'}
             </p>
           </div>
@@ -219,7 +183,6 @@ const UploadSection: React.FC<UploadSectionProps> = ({
             <h3 className="text-lg font-semibold text-green-700 mb-2">Analysis Complete!</h3>
             <p className="text-green-600">
               Your file has been successfully analyzed. View the results below.
->>>>>>> d829c81d (first commit)
             </p>
           </div>
         )}
@@ -233,21 +196,12 @@ const UploadSection: React.FC<UploadSectionProps> = ({
           <div className="grid md:grid-cols-2 gap-4 text-sm">
             <div className="space-y-1">
               <p><span className="font-medium">user_id:</span> User identifier or email</p>
-<<<<<<< HEAD
-              <p><span className="font-medium">timestamp:</span> Login timestamp</p>
-=======
               <p><span className="font-medium">timestamp:</span> Login timestamp (ISO format)</p>
->>>>>>> d829c81d (first commit)
               <p><span className="font-medium">ip_address:</span> User's IP address</p>
             </div>
             <div className="space-y-1">
               <p><span className="font-medium">location:</span> Geographic location</p>
               <p><span className="font-medium">device:</span> Device information</p>
-<<<<<<< HEAD
-              <p><span className="font-medium">success:</span> Login success status</p>
-            </div>
-          </div>
-=======
               <p><span className="font-medium">success:</span> Login success status (true/false)</p>
             </div>
           </div>
@@ -258,7 +212,6 @@ const UploadSection: React.FC<UploadSectionProps> = ({
               user2@example.com,2023-10-15T10:15:00Z,103.21.244.0,Tokyo,Safari macOS,false
             </p>
           </div>
->>>>>>> d829c81d (first commit)
         </div>
       </div>
     </section>
