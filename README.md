@@ -204,3 +204,12 @@ Open **[http://localhost:5173/](http://localhost:5173/)** in your browser.
 * **Future Potential**: roadmap ensures scalability and long-term impact
 
 
+## 👨‍💻 Contributors
+
+* **Jaimin Trivedi**
+* **Purav Shah**
+* **Nigam Sanghvi**
+* **Neel Shah**
+* **Jay Salot**
+
+
