@@ -1,4 +1,3 @@
-// components/Signup.tsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, UserPlus } from 'lucide-react';
@@ -35,7 +34,7 @@ const Signup: React.FC<SignupProps> = ({ onToggleMode, onSignup, loading, error 
               <UserPlus className="w-6 h-6 text-teal-600" />
             </div>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">Create an account</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Create account</h2>
           <p className="text-gray-600 mt-2">Get started with AnomalyGuard AI</p>
         </div>
 
@@ -77,6 +76,21 @@ const Signup: React.FC<SignupProps> = ({ onToggleMode, onSignup, loading, error 
           </div>
 
           <div>
+            <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-1">
+              Company
+            </label>
+            <input
+              id="company"
+              type="text"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              placeholder="Enter your company name"
+              required
+            />
+          </div>
+
+          <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
               Password
             </label>
@@ -102,20 +116,6 @@ const Signup: React.FC<SignupProps> = ({ onToggleMode, onSignup, loading, error 
                 )}
               </button>
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-1">
-              Company (Optional)
-            </label>
-            <input
-              id="company"
-              type="text"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              placeholder="Enter your company name"
-            />
           </div>
 
           <button

@@ -11,7 +11,7 @@ import UploadSection from '../components/UploadSection';
 import { AnalysisState, AnalysisResults } from '../types';
 
 const UploadDataPage: React.FC = () => {
-  const BASE_URL = "https://your-api-domain.com/api"; // Replace with your actual API URL
+  const BASE_URL = "https://bb4aac07ee91.ngrok-free.app"; // Replace with your actual API URL
   const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [results, setResults] = useState<AnalysisResults | null>(null);

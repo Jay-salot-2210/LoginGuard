@@ -5,13 +5,14 @@ import Hero from './components/Hero';
 import WorkflowCarousel from './components/WorkflowCarousel';
 import UploadDataPage from './pages/UploadDataPage';
 import AuthPage from './pages/AuthPage';
+import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AnalysisState } from './types';
 import Chatbot from "./components/Chatbot";
 import DigitalTwinDemo from './components/DigitalTwinDemo';
 import ComplianceSection from './components/ComplianceSection';
+import OtpChallenge from './components/OtpChallenge';
 
-// Define proper types
 interface User {
   _id: string;
   email: string;
@@ -20,17 +21,23 @@ interface User {
 }
 
 function App() {
-  const AUTH_URL = "http://localhost:5000/api"; // Your backend URL
+  const AUTH_URL = "http://localhost:5000/api";
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [otpChallenge, setOtpChallenge] = useState({
+    required: false,
+    userId: '',
+    message: '',
+    expiresIn: 0
+  });
+  const [anomalyDetected, setAnomalyDetected] = useState(false);
 
   // Check if user is logged in on app load
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      // Verify token with backend
       verifyToken(token);
     }
   }, []);
@@ -47,6 +54,7 @@ function App() {
         const userData = await response.json();
         setIsAuthenticated(true);
         setUser(userData.data.user);
+        setAnomalyDetected(false); // User is verified, no anomaly
       } else {
         localStorage.removeItem('token');
         setIsAuthenticated(false);
@@ -74,10 +82,30 @@ function App() {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('token', data.token);
-        setIsAuthenticated(true);
-        setUser(data.data.user);
-        setAuthError(null);
+        if (data.status === 'challenge') {
+          // Store the email for the OTP challenge
+          setUser({ 
+            _id: data.userId, 
+            email: email,
+            name: 'User'
+          });
+          
+          setOtpChallenge({
+            required: true,
+            userId: data.userId,
+            message: data.message,
+            expiresIn: data.expiresInMinutes
+          });
+          setAnomalyDetected(true); // Anomaly detected, require OTP
+          setAuthError(null);
+        } else if (data.status === 'success') {
+          // Normal login success
+          localStorage.setItem('token', data.token);
+          setIsAuthenticated(true);
+          setUser(data.data.user);
+          setAnomalyDetected(false); // No anomaly detected
+          setAuthError(null);
+        }
       } else {
         setAuthError(data.message || 'Login failed. Please check your credentials.');
       }
@@ -108,6 +136,7 @@ function App() {
         localStorage.setItem('token', data.token);
         setIsAuthenticated(true);
         setUser(data.data.user);
+        setAnomalyDetected(false); // New signup, no anomaly
         setAuthError(null);
       } else {
         setAuthError(data.message || 'Signup failed. Please try again.');
@@ -120,11 +149,46 @@ function App() {
     }
   };
 
+  const handleOtpVerify = async (userId: string, otp: string) => {
+    setAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      const response = await fetch(`${AUTH_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, otp }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem('token', data.token);
+        setIsAuthenticated(true);
+        setUser(data.data.user);
+        setOtpChallenge({ required: false, userId: '', message: '', expiresIn: 0 });
+        setAnomalyDetected(false); // OTP verified, anomaly resolved
+        setAuthError(null);
+      } else {
+        setAuthError(data.message || 'Invalid OTP. Please try again.');
+      }
+    } catch (error) {
+      setAuthError('Network error. Please try again.');
+      console.error('OTP verification error:', error);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     setIsAuthenticated(false);
     setUser(null);
     setAuthError(null);
+    setOtpChallenge({ required: false, userId: '', message: '', expiresIn: 0 });
+    setAnomalyDetected(false);
   };
 
   const scrollToSection = (sectionId: string) => {
@@ -153,7 +217,13 @@ function App() {
               <div className="hidden md:flex items-center space-x-8">
                 <Link to="/" className="text-gray-600 hover:text-teal-600 transition-colors">Home</Link>
                 {isAuthenticated && (
-                  <Link to="/upload" className="text-gray-600 hover:text-teal-600 transition-colors">Upload & Analyze</Link>
+                  <>
+                    <Link to="/dashboard" className="text-gray-600 hover:text-teal-600 transition-colors">Dashboard</Link>
+                    {/* Only show Upload button if authenticated AND no anomaly detected */}
+                    {!anomalyDetected && (
+                      <Link to="/upload" className="text-gray-600 hover:text-teal-600 transition-colors">Upload & Analyze</Link>
+                    )}
+                  </>
                 )}
               </div>
               
@@ -204,13 +274,24 @@ function App() {
               path="/auth" 
               element={
                 isAuthenticated ? 
-                  <Navigate to="/" replace /> : 
+                  <Navigate to="/dashboard" replace /> : 
                   <AuthPage 
                     onLogin={handleLogin} 
                     onSignup={handleSignup}
                     loading={authLoading}
                     error={authError}
+                    clearError={() => setAuthError(null)}
                   />
+              } 
+            />
+
+            {/* Dashboard route */}
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                  <Dashboard onLogout={handleLogout} />
+                </ProtectedRoute>
               } 
             />
 
@@ -218,7 +299,7 @@ function App() {
             <Route 
               path="/upload" 
               element={
-                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <ProtectedRoute isAuthenticated={isAuthenticated && !anomalyDetected}>
                   <UploadDataPage />
                 </ProtectedRoute>
               } 
@@ -228,6 +309,20 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
+
+        {/* OTP Challenge Modal */}
+        {otpChallenge.required && (
+          <OtpChallenge
+            userId={otpChallenge.userId}
+            message={otpChallenge.message}
+            expiresIn={otpChallenge.expiresIn}
+            onVerify={handleOtpVerify}
+            onCancel={() => setOtpChallenge({ required: false, userId: '', message: '', expiresIn: 0 })}
+            loading={authLoading}
+            error={authError}
+            userEmail={user?.email || ''}
+          />
+        )}
 
         {/* Chatbot */}
         <Chatbot results={null} />
