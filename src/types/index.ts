@@ -46,3 +46,12 @@ export type AnalysisState = "idle" | "uploaded" | "processing" | "completed" | "
 export interface AnomalyData {
   [country: string]: number; // Country name -> anomaly count
 }
+
+// Add if you don't have these types already
+export interface AttackEvent {
+  time: string;
+  location: string;
+  user: string;
+  status: 'attempting' | 'blocked' | 'detected';
+  description: string;
+}

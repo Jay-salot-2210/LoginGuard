@@ -6,27 +6,12 @@ import WorkflowCarousel from './components/WorkflowCarousel';
 import UploadDataPage from './pages/UploadDataPage';
 import AuthPage from './pages/AuthPage';
 import ProtectedRoute from './components/ProtectedRoute';
-import { AnalysisState, AnalysisResults } from './types';
+import { AnalysisState } from './types';
 import Chatbot from "./components/Chatbot";
+import DigitalTwinDemo from './components/DigitalTwinDemo';
+import ComplianceSection from './components/ComplianceSection';
 
 // Define proper types
-interface Prediction {
-  anomaly_score: number;
-  anomaly: number;
-  Timestamp: string | null;
-  Location: string;
-  UserID: string;
-}
-
-interface FlaggedUser {
-  id: number;
-  user: string;
-  location: string;
-  severity: 'High' | 'Medium' | 'Low';
-  score: number;
-  timestamp: string;
-}
-
 interface User {
   _id: string;
   email: string;
@@ -35,11 +20,7 @@ interface User {
 }
 
 function App() {
-  const BASE_URL = "https://df673b7d2566.ngrok-free.app";
   const AUTH_URL = "http://localhost:5000/api"; // Your backend URL
-  const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [results, setResults] = useState<AnalysisResults | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
@@ -68,10 +49,12 @@ function App() {
         setUser(userData.data.user);
       } else {
         localStorage.removeItem('token');
+        setIsAuthenticated(false);
       }
     } catch (error) {
       console.error('Token verification failed:', error);
       localStorage.removeItem('token');
+      setIsAuthenticated(false);
     }
   };
 
@@ -94,11 +77,13 @@ function App() {
         localStorage.setItem('token', data.token);
         setIsAuthenticated(true);
         setUser(data.data.user);
+        setAuthError(null);
       } else {
-        setAuthError(data.message || 'Login failed');
+        setAuthError(data.message || 'Login failed. Please check your credentials.');
       }
     } catch (error) {
       setAuthError('Network error. Please try again.');
+      console.error('Login error:', error);
     } finally {
       setAuthLoading(false);
     }
@@ -123,11 +108,13 @@ function App() {
         localStorage.setItem('token', data.token);
         setIsAuthenticated(true);
         setUser(data.data.user);
+        setAuthError(null);
       } else {
-        setAuthError(data.message || 'Signup failed');
+        setAuthError(data.message || 'Signup failed. Please try again.');
       }
     } catch (error) {
       setAuthError('Network error. Please try again.');
+      console.error('Signup error:', error);
     } finally {
       setAuthLoading(false);
     }
@@ -137,22 +124,17 @@ function App() {
     localStorage.removeItem('token');
     setIsAuthenticated(false);
     setUser(null);
+    setAuthError(null);
   };
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
-    if (element) element.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const handleFileUpload = (file: File) => {
-    setUploadedFile(file);
-    setAnalysisState('uploaded');
-  };
-
-  const handleReset = () => {
-    setAnalysisState('idle');
-    setUploadedFile(null);
-    setResults(null);
+    if (element) {
+      element.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
   };
 
   return (
@@ -181,18 +163,22 @@ function App() {
                     <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center">
                       <User className="w-4 h-4 text-teal-600" />
                     </div>
-                    <span className="text-sm text-gray-700">{user?.name}</span>
+                    <span className="text-sm text-gray-700 hidden sm:block">{user?.name}</span>
                   </div>
                   <button
                     onClick={handleLogout}
                     className="flex items-center space-x-1 text-sm text-gray-600 hover:text-teal-600 transition-colors"
+                    aria-label="Logout"
                   >
                     <LogOut className="w-4 h-4" />
-                    <span>Logout</span>
+                    <span className="hidden sm:block">Logout</span>
                   </button>
                 </div>
               ) : (
-                <Link to="/auth" className="text-gray-600 hover:text-teal-600 transition-colors">
+                <Link 
+                  to="/auth" 
+                  className="text-gray-600 hover:text-teal-600 transition-colors px-3 py-1 rounded-md hover:bg-teal-50"
+                >
                   Login
                 </Link>
               )}
@@ -200,43 +186,51 @@ function App() {
           </div>
         </nav>
 
-        <Routes>
-          {/* Home route - accessible without auth */}
-          <Route path="/" element={
-            <>
-              <Hero scrollToSection={scrollToSection} isAuthenticated={isAuthenticated} />
-              <WorkflowCarousel />
-            </>
-          } />
+        {/* Main content with padding for fixed navbar */}
+        <div className="pt-16">
+          <Routes>
+            {/* Home route - accessible without auth */}
+            <Route path="/" element={
+              <>
+                <Hero scrollToSection={scrollToSection} isAuthenticated={isAuthenticated} />
+                <WorkflowCarousel />
+                <DigitalTwinDemo />
+                <ComplianceSection />
+              </>
+            } />
 
-          {/* Auth route */}
-          <Route 
-            path="/auth" 
-            element={
-              isAuthenticated ? 
-                <Navigate to="/" replace /> : 
-                <AuthPage 
-                  onLogin={handleLogin} 
-                  onSignup={handleSignup}
-                  loading={authLoading}
-                  error={authError}
-                />
-            } 
-          />
+            {/* Auth route */}
+            <Route 
+              path="/auth" 
+              element={
+                isAuthenticated ? 
+                  <Navigate to="/" replace /> : 
+                  <AuthPage 
+                    onLogin={handleLogin} 
+                    onSignup={handleSignup}
+                    loading={authLoading}
+                    error={authError}
+                  />
+              } 
+            />
 
-          {/* Protected routes */}
-          <Route 
-            path="/upload" 
-            element={
-              <ProtectedRoute isAuthenticated={isAuthenticated}>
-                <UploadDataPage />
-              </ProtectedRoute>
-            } 
-          />
-        </Routes>
+            {/* Protected routes */}
+            <Route 
+              path="/upload" 
+              element={
+                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                  <UploadDataPage />
+                </ProtectedRoute>
+              } 
+            />
 
-        {/* Chatbot receives results dynamically */}
-        <Chatbot results={results} />
+            {/* Catch all route - redirect to home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+
+        {/* Chatbot */}
+        <Chatbot results={null} />
 
         {/* Footer */}
         <footer className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white py-14 mt-16">
@@ -285,6 +279,7 @@ function App() {
               <div className="flex space-x-4 mt-4 md:mt-0">
                 <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
                 <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+                <a href="#" className="hover:text-white transition-colors">Security</a>
               </div>
             </div>
           </div>

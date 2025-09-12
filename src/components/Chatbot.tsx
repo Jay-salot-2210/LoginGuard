@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, X, Minimize2, Maximize2, MessageCircle, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Send, Bot, X, Minimize2, Maximize2, MessageCircle, Mic, MicOff, Volume2, VolumeX, Loader } from 'lucide-react';
 import { AnalysisResults } from '../types';
 
 interface ChatbotProps {
@@ -11,6 +11,43 @@ interface Message {
   text: string;
   sender: 'user' | 'bot';
   timestamp: Date;
+  status?: 'sending' | 'sent' | 'error';
+}
+
+// Error boundary component for better error handling
+class ChatbotErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Chatbot Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed bottom-6 right-6 bg-white rounded-2xl shadow-2xl p-4 w-80 border border-red-200 z-50">
+          <div className="text-red-600 text-center">
+            <p>Chatbot is temporarily unavailable.</p>
+            <button 
+              onClick={() => this.setState({ hasError: false })}
+              className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-sm"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
@@ -22,51 +59,73 @@ const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
   const [isListening, setIsListening] = useState(false);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected'>('connected');
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const synthesisRef = useRef<any>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Check if speech recognition is supported
   useEffect(() => {
     const checkSpeechSupport = () => {
-      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        setIsSpeechSupported(true);
+      try {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+          setIsSpeechSupported(true);
+          
+          // Initialize speech recognition
+          const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+          recognitionRef.current = new SpeechRecognition();
+          recognitionRef.current.continuous = false;
+          recognitionRef.current.interimResults = false;
+          recognitionRef.current.lang = 'en-US';
+          
+          recognitionRef.current.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            setInputText(prev => prev + ' ' + transcript);
+            setIsListening(false);
+          };
+          
+          recognitionRef.current.onerror = (event: any) => {
+            console.error('Speech recognition error', event.error);
+            setIsListening(false);
+            addBotMessage("I couldn't understand that. Could you please try again or type your question?");
+          };
+          
+          recognitionRef.current.onend = () => {
+            setIsListening(false);
+          };
+        } else {
+          setIsSpeechSupported(false);
+          setIsVoiceEnabled(false);
+        }
         
-        // Initialize speech recognition
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = false;
-        recognitionRef.current.lang = 'en-US';
-        
-        recognitionRef.current.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setInputText(transcript);
-          setIsListening(false);
-        };
-        
-        recognitionRef.current.onerror = (event: any) => {
-          console.error('Speech recognition error', event.error);
-          setIsListening(false);
-          addBotMessage("I couldn't understand that. Could you please try again or type your question?");
-        };
-        
-        recognitionRef.current.onend = () => {
-          setIsListening(false);
-        };
-      } else {
+        // Check speech synthesis support
+        if ('speechSynthesis' in window) {
+          synthesisRef.current = window.speechSynthesis;
+        }
+
+        setConnectionStatus('connected');
+      } catch (error) {
+        console.error('Speech support initialization failed:', error);
         setIsSpeechSupported(false);
         setIsVoiceEnabled(false);
-      }
-      
-      // Check speech synthesis support
-      if ('speechSynthesis' in window) {
-        synthesisRef.current = window.speechSynthesis;
+        setConnectionStatus('disconnected');
       }
     };
     
     checkSpeechSupport();
+
+    // Cleanup on unmount
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      if (synthesisRef.current) {
+        synthesisRef.current.cancel();
+      }
+    };
   }, []);
 
   // Predefined questions based on analysis results
@@ -99,45 +158,52 @@ const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
     scrollToBottom();
   }, [messages]);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, []);
 
-  const addMessage = (text: string, sender: 'user' | 'bot') => {
+  const addMessage = useCallback((text: string, sender: 'user' | 'bot', status?: Message['status']) => {
     const newMessage: Message = {
       id: Date.now().toString(),
       text,
       sender,
-      timestamp: new Date()
+      timestamp: new Date(),
+      status
     };
     setMessages(prev => [...prev, newMessage]);
-  };
+  }, []);
 
-  const speakText = (text: string) => {
+  const speakText = useCallback((text: string) => {
     if (isVoiceEnabled && synthesisRef.current) {
-      // Stop any ongoing speech
-      synthesisRef.current.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      utterance.volume = 0.8;
-      
-      utterance.onend = () => {
-        console.log('Finished speaking');
-      };
-      
-      utterance.onerror = (event) => {
-        console.error('Speech synthesis error', event);
-      };
-      
-      synthesisRef.current.speak(utterance);
+      try {
+        // Stop any ongoing speech
+        synthesisRef.current.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        utterance.volume = 0.8;
+        
+        utterance.onend = () => {
+          console.log('Finished speaking');
+        };
+        
+        utterance.onerror = (event) => {
+          console.error('Speech synthesis error', event);
+        };
+        
+        synthesisRef.current.speak(utterance);
+      } catch (error) {
+        console.error('Text-to-speech error:', error);
+      }
     }
-  };
+  }, [isVoiceEnabled]);
 
-  const addBotMessage = (text: string, shouldSpeak = false) => {
+  const addBotMessage = useCallback((text: string, shouldSpeak = false) => {
     setIsTyping(true);
     // Simulate typing delay for more natural interaction
+    const typingDelay = 500 + Math.random() * 500;
+    
     setTimeout(() => {
       addMessage(text, 'bot');
       setIsTyping(false);
@@ -146,96 +212,120 @@ const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
       if (shouldSpeak && isVoiceEnabled) {
         speakText(text);
       }
-    }, 500 + Math.random() * 500);
-  };
+    }, typingDelay);
+  }, [addMessage, isVoiceEnabled, speakText]);
 
-  const handleSendMessage = () => {
-    if (inputText.trim() === '') return;
+  const handleSendMessage = useCallback(() => {
+    if (inputText.trim() === '' || isTyping) return;
 
-    // Add user message
-    addMessage(inputText, 'user');
+    // Add user message with sending status
+    addMessage(inputText, 'user', 'sending');
     const userQuery = inputText.toLowerCase();
     setInputText('');
 
     // Process the query and generate response using enhanced AI logic
     setTimeout(() => {
-      let response = generateAIResponse(userQuery, results);
-      addBotMessage(response, true);
-    }, 600);
-  };
+      try {
+        // Update message status to sent
+        setMessages(prev => prev.map(msg => 
+          msg.sender === 'user' && msg.status === 'sending' 
+            ? { ...msg, status: 'sent' }
+            : msg
+        ));
 
-  const generateAIResponse = (query: string, results: AnalysisResults | null): string => {
-    // Enhanced AI response generation
-    if (results) {
-      // Analysis-specific responses with more intelligence
-      if (query.includes('key finding') || query.includes('summary') || query.includes('overview')) {
-        const riskLevel = results.anomaliesCount / results.totalLogins > 0.1 ? 'high' : 
-                         results.anomaliesCount / results.totalLogins > 0.05 ? 'moderate' : 'low';
-        return `Based on my analysis of ${results.totalLogins} login attempts, I detected ${results.anomaliesCount} anomalous activities (${(results.anomaliesCount/results.totalLogins*100).toFixed(1)}%). 
-                The risk level is ${riskLevel} with ${results.severityBreakdown.high} high risk, ${results.severityBreakdown.medium} medium risk, and ${results.severityBreakdown.low} low risk anomalies.
-                ${results.severityBreakdown.high > 0 ? 'I recommend immediate attention to the high-risk anomalies.' : 'No critical issues were detected.'}`;
-      } 
-      else if (query.includes('risk') || query.includes('high severity') || query.includes('critical')) {
-        const highRiskUsers = results.flaggedUsers.filter(user => user.severity === 'High');
-        if (highRiskUsers.length > 0) {
-          const topUser = highRiskUsers[0];
-          return `I found ${highRiskUsers.length} high-risk users requiring immediate attention. The most critical is ${topUser.user} from ${topUser.location} with a risk score of ${topUser.score.toFixed(2)}. 
-                  This occurred at ${topUser.timestamp}. I recommend immediately verifying this user's activity and potentially triggering additional authentication measures.`;
-        } else {
-          return "No high-risk users were detected in this analysis. All flagged anomalies are of medium or low severity, which is a positive indicator for your current security posture.";
+        let response = generateAIResponse(userQuery, results);
+        addBotMessage(response, true);
+      } catch (error) {
+        console.error('Error generating response:', error);
+        addBotMessage("I'm experiencing some technical difficulties. Please try again in a moment.");
+        
+        // Update message status to error
+        setMessages(prev => prev.map(msg => 
+          msg.sender === 'user' && msg.status === 'sending' 
+            ? { ...msg, status: 'error' }
+            : msg
+        ));
+      }
+    }, 600);
+  }, [inputText, isTyping, addMessage, addBotMessage, results]);
+
+  const generateAIResponse = useCallback((query: string, results: AnalysisResults | null): string => {
+    try {
+      // Enhanced AI response generation
+      if (results) {
+        // Analysis-specific responses with more intelligence
+        if (query.includes('key finding') || query.includes('summary') || query.includes('overview')) {
+          const riskLevel = results.anomaliesCount / results.totalLogins > 0.1 ? 'high' : 
+                          results.anomaliesCount / results.totalLogins > 0.05 ? 'moderate' : 'low';
+          return `Based on my analysis of ${results.totalLogins} login attempts, I detected ${results.anomaliesCount} anomalous activities (${(results.anomaliesCount/results.totalLogins*100).toFixed(1)}%). 
+                  The risk level is ${riskLevel} with ${results.severityBreakdown.high} high risk, ${results.severityBreakdown.medium} medium risk, and ${results.severityBreakdown.low} low risk anomalies.
+                  ${results.severityBreakdown.high > 0 ? 'I recommend immediate attention to the high-risk anomalies.' : 'No critical issues were detected.'}`;
+        } 
+        else if (query.includes('risk') || query.includes('high severity') || query.includes('critical')) {
+          const highRiskUsers = results.flaggedUsers.filter(user => user.severity === 'High');
+          if (highRiskUsers.length > 0) {
+            const topUser = highRiskUsers[0];
+            return `I found ${highRiskUsers.length} high-risk users requiring immediate attention. The most critical is ${topUser.user} from ${topUser.location} with a risk score of ${topUser.score.toFixed(2)}. 
+                    This occurred at ${topUser.timestamp}. I recommend immediately verifying this user's activity and potentially triggering additional authentication measures.`;
+          } else {
+            return "No high-risk users were detected in this analysis. All flagged anomalies are of medium or low severity, which is a positive indicator for your current security posture.";
+          }
+        }
+        else if (query.includes('pattern') || query.includes('trend') || query.includes('detect')) {
+          const peakTime = getPeakAnomalyTime(results);
+          const topRegion = getTopAnomalyRegion(results);
+          return `I've identified several important patterns: 
+                  1) Temporal: Most anomalies occurred around ${peakTime} 
+                  2) Geographical: Higher concentrations in ${topRegion}
+                  3) Behavioral: ${results.flaggedUsers.length > 0 ? 'Multiple login attempts from unusual locations' : 'No consistent behavioral patterns detected'}
+                  These patterns suggest ${peakTime.includes('night') ? 'potential off-hours access issues' : 'possible credential sharing during peak hours'}.`;
+        }
+        else if (query.includes('recommend') || query.includes('action') || query.includes('next')) {
+          const hasHighRisk = results.severityBreakdown.high > 0;
+          return `Based on my analysis, I recommend: 
+                  1) ${hasHighRisk ? 'Immediately review high-risk user accounts' : 'Continue monitoring medium-risk anomalies'}
+                  2) Implement ${hasHighRisk ? 'immediate additional authentication' : 'step-up authentication'} for suspicious locations
+                  3) ${results.timeSeriesData.length > 3 ? 'Focus monitoring during peak anomaly hours' : 'Maintain current monitoring levels'}
+                  4) Consider ${hasHighRisk ? 'immediate security policy updates' : 'proactive policy reviews'}
+                  Would you like me to elaborate on any of these recommendations?`;
+        }
+        else if (query.includes('report') || query.includes('export') || query.includes('download')) {
+          return "You can download a comprehensive security report using the 'Generate Report' button in the analysis dashboard. This PDF report includes detailed information about all detected anomalies, visualizations of patterns, and specific recommended actions with priority levels. Would you like me to guide you through the report generation process?";
+        }
+        else if (query.includes('thank') || query.includes('thanks')) {
+          return "You're welcome! I'm here to help you maintain strong security posture. Is there anything else you'd like to know about your anomaly detection results?";
+        }
+        else {
+          return "I can help you understand your security analysis results in depth. Try asking about specific findings, risk levels, patterns, or recommendations. You can also ask me to explain any technical terms or suggest next steps for specific anomalies.";
+        }
+      } else {
+        // General questions when no results are available with more detailed responses
+        if (query.includes('how') && query.includes('work')) {
+          return "I use advanced machine learning algorithms to analyze login patterns across multiple dimensions: geographical location, time of access, device fingerprints, and behavioral patterns. My neural networks are trained on millions of login attempts to identify anomalies that deviate from established patterns. I continuously learn from new data to improve detection accuracy while maintaining low false positive rates.";
+        }
+        else if (query.includes('what data') || query.includes('upload')) {
+          return "For optimal analysis, please upload a CSV file with these columns: user_id, timestamp, ip_address, location, device, browser, login_success. The timestamp should be in ISO format (YYYY-MM-DDTHH:MM:SSZ). I can analyze data from various sources including cloud platforms, VPN logs, and authentication servers. The more historical data you provide, the better I can establish normal patterns and detect anomalies.";
+        }
+        else if (query.includes('type') || query.includes('anomaly')) {
+          return "I detect several types of security anomalies: 1) Geographical anomalies (logins from unusual locations based on user history), 2) Temporal anomalies (access at unusual times), 3) Behavioral anomalies (unusual login patterns or sequences), 4) Device anomalies (access from unrecognized devices), and 5) Velocity anomalies (unusually high login frequency). I also correlate these dimensions to identify sophisticated multi-vector attacks.";
+        }
+        else if (query.includes('accurate') || query.includes('precision')) {
+          return "My detection system achieves over 97% accuracy with less than 3% false positive rate based on continuous validation against known threat datasets. I use ensemble learning methods that combine multiple algorithms for optimal performance. The system undergoes daily retraining with new threat intelligence to maintain high detection rates for emerging attack patterns while minimizing disruption to legitimate users.";
+        }
+        else if (query.includes('hello') || query.includes('hi') || query.includes('hey')) {
+          return "Hello! I'm your AI security assistant, ready to help with anomaly detection and security analysis. How can I assist you today?";
+        }
+        else {
+          return "I'm here to help with security analysis and anomaly detection. I can explain how the system works, what data to provide, types of threats detected, and our accuracy metrics. Once you upload data, I can provide detailed analysis of detected anomalies and recommended actions. What would you like to know?";
         }
       }
-      else if (query.includes('pattern') || query.includes('trend') || query.includes('detect')) {
-        const peakTime = getPeakAnomalyTime(results);
-        const topRegion = getTopAnomalyRegion(results);
-        return `I've identified several important patterns: 
-                1) Temporal: Most anomalies occurred around ${peakTime} 
-                2) Geographical: Higher concentrations in ${topRegion}
-                3) Behavioral: ${results.flaggedUsers.length > 0 ? 'Multiple login attempts from unusual locations' : 'No consistent behavioral patterns detected'}
-                These patterns suggest ${peakTime.includes('night') ? 'potential off-hours access issues' : 'possible credential sharing during peak hours'}.`;
-      }
-      else if (query.includes('recommend') || query.includes('action') || query.includes('next')) {
-        const hasHighRisk = results.severityBreakdown.high > 0;
-        return `Based on my analysis, I recommend: 
-                1) ${hasHighRisk ? 'Immediately review high-risk user accounts' : 'Continue monitoring medium-risk anomalies'}
-                2) Implement ${hasHighRisk ? 'immediate additional authentication' : 'step-up authentication'} for suspicious locations
-                3) ${results.timeSeriesData.length > 3 ? 'Focus monitoring during peak anomaly hours' : 'Maintain current monitoring levels'}
-                4) Consider ${hasHighRisk ? 'immediate security policy updates' : 'proactive policy reviews'}
-                Would you like me to elaborate on any of these recommendations?`;
-      }
-      else if (query.includes('report') || query.includes('export') || query.includes('download')) {
-        return "You can download a comprehensive security report using the 'Generate Report' button in the analysis dashboard. This PDF report includes detailed information about all detected anomalies, visualizations of patterns, and specific recommended actions with priority levels. Would you like me to guide you through the report generation process?";
-      }
-      else if (query.includes('thank') || query.includes('thanks')) {
-        return "You're welcome! I'm here to help you maintain strong security posture. Is there anything else you'd like to know about your anomaly detection results?";
-      }
-      else {
-        return "I can help you understand your security analysis results in depth. Try asking about specific findings, risk levels, patterns, or recommendations. You can also ask me to explain any technical terms or suggest next steps for specific anomalies.";
-      }
-    } else {
-      // General questions when no results are available with more detailed responses
-      if (query.includes('how') && query.includes('work')) {
-        return "I use advanced machine learning algorithms to analyze login patterns across multiple dimensions: geographical location, time of access, device fingerprints, and behavioral patterns. My neural networks are trained on millions of login attempts to identify anomalies that deviate from established patterns. I continuously learn from new data to improve detection accuracy while maintaining low false positive rates.";
-      }
-      else if (query.includes('what data') || query.includes('upload')) {
-        return "For optimal analysis, please upload a CSV file with these columns: user_id, timestamp, ip_address, location, device, browser, login_success. The timestamp should be in ISO format (YYYY-MM-DDTHH:MM:SSZ). I can analyze data from various sources including cloud platforms, VPN logs, and authentication servers. The more historical data you provide, the better I can establish normal patterns and detect anomalies.";
-      }
-      else if (query.includes('type') || query.includes('anomaly')) {
-        return "I detect several types of security anomalies: 1) Geographical anomalies (logins from unusual locations based on user history), 2) Temporal anomalies (access at unusual times), 3) Behavioral anomalies (unusual login patterns or sequences), 4) Device anomalies (access from unrecognized devices), and 5) Velocity anomalies (unusually high login frequency). I also correlate these dimensions to identify sophisticated multi-vector attacks.";
-      }
-      else if (query.includes('accurate') || query.includes('precision')) {
-        return "My detection system achieves over 97% accuracy with less than 3% false positive rate based on continuous validation against known threat datasets. I use ensemble learning methods that combine multiple algorithms for optimal performance. The system undergoes daily retraining with new threat intelligence to maintain high detection rates for emerging attack patterns while minimizing disruption to legitimate users.";
-      }
-      else if (query.includes('hello') || query.includes('hi') || query.includes('hey')) {
-        return "Hello! I'm your AI security assistant, ready to help with anomaly detection and security analysis. How can I assist you today?";
-      }
-      else {
-        return "I'm here to help with security analysis and anomaly detection. I can explain how the system works, what data to provide, types of threats detected, and our accuracy metrics. Once you upload data, I can provide detailed analysis of detected anomalies and recommended actions. What would you like to know?";
-      }
+    } catch (error) {
+      console.error('Error generating AI response:', error);
+      return "I apologize, but I'm having trouble processing your request right now. Please try again in a moment.";
     }
-  };
+  }, []);
 
-  const getPeakAnomalyTime = (results: AnalysisResults) => {
+  const getPeakAnomalyTime = useCallback((results: AnalysisResults) => {
     if (!results.timeSeriesData || results.timeSeriesData.length === 0) {
       return "various times";
     }
@@ -245,9 +335,9 @@ const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
     );
     
     return peakTime.time;
-  };
+  }, []);
 
-  const getTopAnomalyRegion = (results: AnalysisResults) => {
+  const getTopAnomalyRegion = useCallback((results: AnalysisResults) => {
     if (!results.regionalData || results.regionalData.length === 0) {
       return "various regions";
     }
@@ -257,49 +347,79 @@ const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
     );
     
     return topRegion.region;
-  };
+  }, []);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       handleSendMessage();
     }
-  };
+  }, [handleSendMessage]);
 
-  const handlePredefinedQuestionClick = (question: string) => {
+  const handlePredefinedQuestionClick = useCallback((question: string) => {
     setInputText(question);
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  };
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 100);
+  }, []);
 
-  const toggleChat = () => {
-    setIsOpen(!isOpen);
+  const toggleChat = useCallback(() => {
+    setIsOpen(prev => !prev);
     if (!isOpen) {
       setIsMinimized(false);
     }
-  };
+  }, [isOpen]);
 
-  const toggleMinimize = () => {
-    setIsMinimized(!isMinimized);
-  };
+  const toggleMinimize = useCallback(() => {
+    setIsMinimized(prev => !prev);
+  }, []);
 
-  const toggleListening = () => {
+  const toggleListening = useCallback(() => {
+    if (!isSpeechSupported || isTyping) return;
+
     if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
+      try {
+        recognitionRef.current.stop();
+        setIsListening(false);
+      } catch (error) {
+        console.error('Error stopping speech recognition:', error);
+        setIsListening(false);
+      }
     } else {
-      recognitionRef.current.start();
-      setIsListening(true);
-      setInputText(''); // Clear input when starting to listen
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+        setInputText(''); // Clear input when starting to listen
+      } catch (error) {
+        console.error('Error starting speech recognition:', error);
+        setIsListening(false);
+        addBotMessage("Voice input is not available right now. Please type your question.");
+      }
     }
-  };
+  }, [isSpeechSupported, isTyping, isListening, addBotMessage]);
 
-  const toggleVoice = () => {
-    setIsVoiceEnabled(!isVoiceEnabled);
-    if (!isVoiceEnabled && synthesisRef.current && synthesisRef.current.speaking) {
+  const toggleVoice = useCallback(() => {
+    setIsVoiceEnabled(prev => !prev);
+    if (isVoiceEnabled && synthesisRef.current && synthesisRef.current.speaking) {
       synthesisRef.current.cancel();
     }
-  };
+  }, [isVoiceEnabled]);
+
+  // Close chatbot when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isOpen && chatContainerRef.current && !chatContainerRef.current.contains(event.target as Node)) {
+        setIsMinimized(true);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
 
   if (!isOpen) {
     return (
@@ -309,19 +429,27 @@ const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
         aria-label="Open chat"
       >
         <MessageCircle size={24} />
+        {connectionStatus === 'disconnected' && (
+          <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+        )}
       </button>
     );
   }
 
   return (
-    <div className={`fixed bottom-6 right-6 bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-200 transition-all duration-300 z-50
-      ${isMinimized ? 'h-16 w-64' : 'h-[500px] w-80'}`}
+    <div 
+      ref={chatContainerRef}
+      className={`fixed bottom-6 right-6 bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-200 transition-all duration-300 z-50
+        ${isMinimized ? 'h-16 w-64' : 'h-[500px] w-80'}`}
     >
       {/* Header */}
       <div className="bg-gradient-to-r from-teal-600 to-blue-600 text-white p-4 rounded-t-2xl flex justify-between items-center">
         <div className="flex items-center space-x-2">
           <Bot size={20} />
           <span className="font-semibold">AI Security Assistant</span>
+          {connectionStatus === 'disconnected' && (
+            <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse" title="Connection issues"></span>
+          )}
         </div>
         <div className="flex space-x-2">
           <button
@@ -352,16 +480,24 @@ const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
                   className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-xs lg:max-w-md rounded-2xl p-3 ${
+                    className={`max-w-xs lg:max-w-md rounded-2xl p-3 relative ${
                       message.sender === 'user'
                         ? 'bg-blue-500 text-white rounded-br-none'
                         : 'bg-gray-200 text-gray-800 rounded-bl-none'
-                    }`}
+                    } ${message.status === 'error' ? 'border border-red-300' : ''}`}
                   >
                     <p className="text-sm">{message.text}</p>
-                    <p className={`text-xs mt-1 ${message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+                    <div className="flex justify-between items-center mt-1">
+                      <p className={`text-xs ${message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
+                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                      {message.status === 'sending' && (
+                        <Loader size={12} className="animate-spin ml-2" />
+                      )}
+                      {message.status === 'error' && (
+                        <span className="text-xs text-red-500 ml-2">Failed</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -388,12 +524,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
           {/* Predefined Questions */}
           {predefinedQuestions.length > 0 && (
             <div className="px-4 py-2 bg-white border-t border-gray-200">
+              <p className="text-xs text-gray-500 mb-2">Quick questions:</p>
               <div className="flex flex-wrap gap-2">
                 {predefinedQuestions.map((question, index) => (
                   <button
                     key={index}
                     onClick={() => handlePredefinedQuestionClick(question)}
-                    className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-full transition-colors"
+                    disabled={isTyping}
+                    className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {question}
                   </button>
@@ -412,7 +550,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type your question..."
-                className="flex-1 bg-gray-100 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 bg-gray-100 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                 disabled={isTyping}
               />
               
@@ -425,7 +563,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
                     className={`p-2 rounded-full flex items-center justify-center transition-colors ${
                       isListening 
                         ? 'bg-red-500 text-white animate-pulse' 
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50'
                     }`}
                     aria-label={isListening ? "Stop listening" : "Start voice input"}
                   >
@@ -438,7 +576,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
                     className={`p-2 rounded-full flex items-center justify-center transition-colors ${
                       isVoiceEnabled 
                         ? 'bg-teal-500 text-white' 
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50'
                     }`}
                     aria-label={isVoiceEnabled ? "Disable voice" : "Enable voice"}
                   >
@@ -473,4 +611,13 @@ const Chatbot: React.FC<ChatbotProps> = ({ results }) => {
   );
 };
 
-export default Chatbot;
+// Wrap with error boundary
+const ChatbotWithErrorBoundary: React.FC<ChatbotProps> = (props) => {
+  return (
+    <ChatbotErrorBoundary>
+      <Chatbot {...props} />
+    </ChatbotErrorBoundary>
+  );
+};
+
+export default ChatbotWithErrorBoundary;
