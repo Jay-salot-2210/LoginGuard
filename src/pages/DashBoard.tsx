@@ -1,32 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, AlertTriangle, CheckCircle, Clock, RefreshCw, Mail } from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle, Clock, RefreshCw, Mail, BarChart3, History } from 'lucide-react';
 
-const AnomalyGuardDashboard: React.FC = () => {
+interface DashboardProps {
+  onLogout: () => void;
+  anomalyDetected: boolean;
+  lastRiskScore: number;
+}
+
+const AnomalyGuardDashboard: React.FC<DashboardProps> = ({ onLogout, anomalyDetected, lastRiskScore }) => {
   const [anomalyStatus, setAnomalyStatus] = useState<'checking' | 'detected' | 'normal'>('checking');
   const [otpStatus, setOtpStatus] = useState<'idle' | 'sending' | 'sent' | 'verifying' | 'verified' | 'failed'>('idle');
   const [otpCode, setOtpCode] = useState('');
   const [userEmail, setUserEmail] = useState('user@example.com');
   const [countdown, setCountdown] = useState(0);
+  const [riskHistory, setRiskHistory] = useState<any[]>([]);
+  const [showRiskHistory, setShowRiskHistory] = useState(false);
 
-  // Simulate anomaly detection
+  // Initialize with props
   useEffect(() => {
-    const checkAnomaly = async () => {
-      // Simulate API call to check for anomalies
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Randomly determine if anomaly is detected (30% chance)
-      const hasAnomaly = Math.random() < 0.3;
-      setAnomalyStatus(hasAnomaly ? 'detected' : 'normal');
-      
-      // If anomaly detected, send OTP automatically
-      if (hasAnomaly) {
-        sendOtp();
-      }
-    };
+    if (anomalyDetected) {
+      setAnomalyStatus('detected');
+      // If anomaly is detected from props, send OTP automatically
+      sendOtp();
+    } else {
+      setAnomalyStatus('normal');
+    }
+    
+    // Fetch risk history
+    fetchRiskHistory();
+  }, [anomalyDetected]);
 
-    checkAnomaly();
-  }, []);
+  // Fetch risk history from backend
+  const fetchRiskHistory = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/auth/risk-history', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setRiskHistory(data.data.riskHistory || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch risk history:', error);
+    }
+  };
 
   // Countdown timer for OTP
   useEffect(() => {
@@ -69,9 +91,18 @@ const AnomalyGuardDashboard: React.FC = () => {
     sendOtp();
   };
 
+  // Calculate risk level based on score
+  const getRiskLevel = (score: number) => {
+    if (score >= 0.8) return { level: 'High', color: 'text-red-600', bg: 'bg-red-100' };
+    if (score >= 0.5) return { level: 'Medium', color: 'text-amber-600', bg: 'bg-amber-100' };
+    return { level: 'Low', color: 'text-green-600', bg: 'bg-green-100' };
+  };
+
+  const riskInfo = getRiskLevel(lastRiskScore);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="text-center mb-10">
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center shadow-sm">
@@ -85,6 +116,119 @@ const AnomalyGuardDashboard: React.FC = () => {
             Monitoring and protecting your cloud environment
           </p>
         </div>
+
+        {/* Risk Score Card */}
+        <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">Current Risk Assessment</h2>
+            <button 
+              onClick={() => setShowRiskHistory(!showRiskHistory)}
+              className="flex items-center space-x-2 text-sm text-teal-600 hover:text-teal-700"
+            >
+              <History className="w-4 h-4" />
+              <span>{showRiskHistory ? 'Hide History' : 'View History'}</span>
+            </button>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="bg-gradient-to-br from-blue-50 to-teal-50 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-medium text-gray-700">Last Login Risk Score</h3>
+                <BarChart3 className="w-5 h-5 text-teal-600" />
+              </div>
+              
+              <div className="text-center">
+                <div className={`text-4xl font-bold mb-2 ${riskInfo.color}`}>
+                  {(lastRiskScore * 100).toFixed(1)}%
+                </div>
+                <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${riskInfo.bg} ${riskInfo.color}`}>
+                  {riskInfo.level} Risk
+                </div>
+                <p className="text-sm text-gray-600 mt-3">
+                  {lastRiskScore >= 0.8 
+                    ? 'High risk detected. Additional verification required.' 
+                    : lastRiskScore >= 0.5
+                    ? 'Moderate risk level. Monitor activity closely.'
+                    : 'Low risk level. Normal login pattern.'
+                  }
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-50 to-gray-100 rounded-lg p-6">
+              <h3 className="font-medium text-gray-700 mb-4">Risk Interpretation</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">0-30%</span>
+                  <span className="text-sm font-medium text-green-600">Low Risk</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-green-500 h-2 rounded-full" style={{ width: '30%' }}></div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">30-70%</span>
+                  <span className="text-sm font-medium text-amber-600">Medium Risk</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-amber-500 h-2 rounded-full" style={{ width: '70%' }}></div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">70-100%</span>
+                  <span className="text-sm font-medium text-red-600">High Risk</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-red-500 h-2 rounded-full" style={{ width: '100%' }}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Risk History Panel */}
+        {showRiskHistory && riskHistory.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="bg-white rounded-xl shadow-md p-6 mb-8"
+          >
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Login History</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2">Time</th>
+                    <th className="text-left py-2">Risk Score</th>
+                    <th className="text-left py-2">Status</th>
+                    <th className="text-left py-2">Location</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {riskHistory.map((login, index) => {
+                    const loginRiskInfo = getRiskLevel(login.riskScore);
+                    return (
+                      <tr key={index} className="border-b hover:bg-gray-50">
+                        <td className="py-3">{new Date(login.time).toLocaleString()}</td>
+                        <td className="py-3">
+                          <span className={`font-medium ${loginRiskInfo.color}`}>
+                            {(login.riskScore * 100).toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className="py-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${loginRiskInfo.bg} ${loginRiskInfo.color}`}>
+                            {loginRiskInfo.level}
+                          </span>
+                        </td>
+                        <td className="py-3">{login.location}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
 
         {/* Anomaly Status Card */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-8">
@@ -248,6 +392,16 @@ const AnomalyGuardDashboard: React.FC = () => {
             </div>
           </motion.div>
         )}
+
+        {/* Logout Button */}
+        <div className="text-center mt-8">
+          <button
+            onClick={onLogout}
+            className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   );

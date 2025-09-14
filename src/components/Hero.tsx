@@ -114,11 +114,11 @@ const Hero: React.FC<HeroProps> = ({ scrollToSection, isAuthenticated }) => {
                     <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-teal-600">JD</span>
+                          <span className="text-sm font-medium text-teal-600">AR</span>
                         </div>
                         <div>
-                          <div className="text-sm font-medium">john.doe@company.com</div>
-                          <div className="text-xs text-gray-500">New York, USA • 09:42 AM</div>
+                          <div className="text-sm font-medium">arjun.rathi@company.in</div>
+                          <div className="text-xs text-gray-500">Mumbai, India • 09:42 AM</div>
                         </div>
                       </div>
                       <div className="text-xs text-gray-500">Chrome • Windows</div>
@@ -127,11 +127,11 @@ const Hero: React.FC<HeroProps> = ({ scrollToSection, isAuthenticated }) => {
                     <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-teal-600">AS</span>
+                          <span className="text-sm font-medium text-teal-600">NS</span>
                         </div>
                         <div>
-                          <div className="text-sm font-medium">alice.smith@company.com</div>
-                          <div className="text-xs text-gray-500">London, UK • 09:38 AM</div>
+                          <div className="text-sm font-medium">nisha.singh@company.in</div>
+                          <div className="text-xs text-gray-500">Delhi, India • 09:38 AM</div>
                         </div>
                       </div>
                       <div className="text-xs text-gray-500">Safari • macOS</div>
@@ -140,11 +140,11 @@ const Hero: React.FC<HeroProps> = ({ scrollToSection, isAuthenticated }) => {
                     <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-200 hover:bg-red-100 transition-colors">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-red-600">RS</span>
+                          <span className="text-sm font-medium text-red-600">RK</span>
                         </div>
                         <div>
-                          <div className="text-sm font-medium">robert.smith@company.com</div>
-                          <div className="text-xs text-red-600">Moscow, Russia • 09:35 AM</div>
+                          <div className="text-sm font-medium">ravi.kumar@company.in</div>
+                          <div className="text-xs text-red-600">Bangalore, India • 09:35 AM</div>
                         </div>
                       </div>
                       <div className="text-xs font-medium text-red-600 flex items-center">
@@ -156,11 +156,11 @@ const Hero: React.FC<HeroProps> = ({ scrollToSection, isAuthenticated }) => {
                     <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-teal-600">MJ</span>
+                          <span className="text-sm font-medium text-teal-600">MP</span>
                         </div>
                         <div>
-                          <div className="text-sm font-medium">michael.jones@company.com</div>
-                          <div className="text-xs text-gray-500">San Francisco, USA • 09:28 AM</div>
+                          <div className="text-sm font-medium">mohit.patel@company.in</div>
+                          <div className="text-xs text-gray-500">Ahmedabad, India • 09:28 AM</div>
                         </div>
                       </div>
                       <div className="text-xs text-gray-500">Firefox • Linux</div>
@@ -169,11 +169,11 @@ const Hero: React.FC<HeroProps> = ({ scrollToSection, isAuthenticated }) => {
                     <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg border border-yellow-200 hover:bg-yellow-100 transition-colors">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-yellow-600">TW</span>
+                          <span className="text-sm font-medium text-yellow-600">TS</span>
                         </div>
                         <div>
-                          <div className="text-sm font-medium">taylor.wong@company.com</div>
-                          <div className="text-xs text-yellow-700">Tokyo, Japan • 09:25 AM</div>
+                          <div className="text-sm font-medium">tanya.sharma@company.in</div>
+                          <div className="text-xs text-yellow-700">Hyderabad, India • 09:25 AM</div>
                         </div>
                       </div>
                       <div className="text-xs font-medium text-yellow-700 flex items-center">

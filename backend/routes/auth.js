@@ -1,11 +1,13 @@
-// backend/routes/auth.js
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
+
+// Fix the User import - use require with the correct path
 const User = require('../models/User');
 const { sendOtpEmail } = require('../utils/email');
-const { assessLogin, makeFingerprintFromReq, getIpFromReq } = require('../utils/anomalyDetector');
-const anomalyDetector = require('../middleware/anomalyDetector'); // Add this
+const { makeFingerprintFromReq, getIpFromReq } = require('../utils/anomalyDetector');
+const anomalyDetector = require('../middleware/anomalyDetector');
 
 const router = express.Router();
 
@@ -15,23 +17,63 @@ const signToken = (id) => {
   });
 };
 
+// Helper function to check MongoDB connection
+const checkMongoConnection = (res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ 
+      status: 'fail', 
+      message: 'Database not available. Please try again later.' 
+    });
+  }
+  return null;
+};
+
 // ---------- SIGNUP ----------
 router.post('/signup', async (req, res) => {
   try {
+    const connectionError = checkMongoConnection(res);
+    if (connectionError) return connectionError;
+
     const { email, password, name, company } = req.body;
-    const existing = await User.findOne({ email });
+    
+    // Validate email
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({ 
+        status: 'fail', 
+        message: 'Valid email address is required' 
+      });
+    }
+    
+    const existing = await User.findOne({ email: email.toLowerCase().trim() });
     if (existing) {
       return res.status(409).json({ status: 'fail', message: 'Email already registered' });
     }
 
-    const user = await User.create({ email, password, name, company });
+    const user = await User.create({ 
+      email: email.toLowerCase().trim(),
+      password, 
+      name, 
+      company 
+    });
+    
+    console.log('New user created:', {
+      id: user._id,
+      email: user.email,
+      name: user.name
+    });
+    
     user.password = undefined;
     
     // Sign token for immediate login after signup
     const token = signToken(user._id);
     res.status(201).json({ status: 'success', data: { user, token }});
   } catch (err) {
-    console.error(err);
+    console.error('Signup error:', err);
+    
+    if (err.name === 'MongoServerError' && err.code === 11000) {
+      return res.status(409).json({ status: 'fail', message: 'Email already registered' });
+    }
+    
     res.status(500).json({ status: 'fail', message: err.message });
   }
 });
@@ -39,29 +81,68 @@ router.post('/signup', async (req, res) => {
 // ---------- LOGIN (with anomaly detection + OTP challenge) ----------
 router.post('/login', async (req, res, next) => {
   try {
+    const connectionError = checkMongoConnection(res);
+    if (connectionError) return connectionError;
+
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ status: 'fail', message: 'Email and password required' });
 
-    const user = await User.findOne({ email }).select('+password +otpHash +otpExpires trustedDevices loginHistory');
-    if (!user) return res.status(401).json({ status: 'fail', message: 'Incorrect email or password' });
+    // FIRST: Find user by email to get the ID
+    const userByEmail = await User.findOne({ email: email.toLowerCase().trim() })
+      .select('_id password');
+    
+    if (!userByEmail) return res.status(401).json({ status: 'fail', message: 'Incorrect email or password' });
 
-    const correct = await user.correctPassword(password, user.password);
+    const correct = await userByEmail.correctPassword(password, userByEmail.password);
     if (!correct) return res.status(401).json({ status: 'fail', message: 'Incorrect email or password' });
 
-    // Attach user to request for middleware
-    req.user = user;
+    // SECOND: Now get the complete user data with all fields
+    const completeUser = await User.findById(userByEmail._id)
+      .select('+password +otpHash +otpExpires +email +name trustedDevices loginHistory company');
+    
+    if (!completeUser) return res.status(401).json({ status: 'fail', message: 'User not found' });
+
+    // Debug: Check what fields are available
+    console.log('Complete user found:', {
+      id: completeUser._id,
+      email: completeUser.email,
+      name: completeUser.name,
+      hasEmail: !!completeUser.email,
+      hasName: !!completeUser.name,
+      allFields: Object.keys(completeUser.toObject ? completeUser.toObject() : {})
+    });
+
+    // Attach complete user to request for middleware
+    req.user = completeUser;
     
     // Call next to proceed to anomaly detection middleware
     next();
   } catch (err) {
     console.error('Login error', err);
+    
+    if (err.name === 'MongoServerError') {
+      return res.status(503).json({ status: 'fail', message: 'Database error. Please try again.' });
+    }
+    
     res.status(500).json({ status: 'fail', message: 'Server error' });
   }
 }, anomalyDetector, async (req, res) => {
   // This is the final handler after anomaly detection
   try {
+    const connectionError = checkMongoConnection(res);
+    if (connectionError) return connectionError;
+
     const user = req.user;
     
+    // Debug: Check user object in final handler
+    console.log('User in final handler:', {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      hasEmail: !!user.email,
+      hasName: !!user.name
+    });
+
     // Check if anomaly detection middleware set a challenge requirement
     if (res.anomalyChallengeRequired) {
       // Anomalous: create OTP, email it, save otpHash + expiry to user
@@ -71,87 +152,132 @@ router.post('/login', async (req, res, next) => {
       const otpHash = await bcrypt.hash(otp, 12);
       const expires = Date.now() + (Number(process.env.OTP_EXPIRES_MINUTES || 30) * 60 * 1000);
 
-      user.otpHash = otpHash;
-      user.otpExpires = new Date(expires);
-
-      // Save login history
-      const fingerprint = makeFingerprintFromReq(req);
-      const ip = getIpFromReq(req);
-      const geo = ip ? require('geoip-lite').lookup(ip) || {} : {};
-      
-      user.loginHistory = user.loginHistory || [];
-      user.loginHistory.push({
-        ip: ip,
-        country: geo.country || '',
-        city: geo.city || '',
-        device: req.headers['user-agent'] || '',
-        time: new Date(),
-        status: 'challenged',
-        riskScore: req.riskScore
+      // Update user with OTP data
+      await User.findByIdAndUpdate(user._id, {
+        otpHash,
+        otpExpires: new Date(expires),
+        hasPendingAnomaly: true,
+        $push: {
+          loginHistory: {
+            ip: getIpFromReq(req),
+            country: (require('geoip-lite').lookup(getIpFromReq(req)) || {}).country || '',
+            city: (require('geoip-lite').lookup(getIpFromReq(req)) || {}).city || '',
+            device: req.headers['user-agent'] || '',
+            time: new Date(),
+            status: 'challenged',
+            riskScore: req.riskScore
+          }
+        }
       });
 
-      await user.save();
+      // Get fresh user data to ensure we have email
+      const freshUser = await User.findById(user._id);
+      
+      // Debug logging
+      console.log('Fresh user data for OTP:', {
+        userId: freshUser._id,
+        email: freshUser.email,
+        name: freshUser.name
+      });
 
-      try {
-        await sendOtpEmail(user.email, otp, user.name);
-      } catch (mailErr) {
-        console.error('Failed to send OTP email:', mailErr);
+      // Check if email is valid before attempting to send
+      if (!freshUser.email || typeof freshUser.email !== 'string' || !freshUser.email.includes('@')) {
+        console.error('Invalid user email, cannot send OTP:', freshUser.email);
+        
+        // Return OTP in response for development
+        return res.status(200).json({
+          status: 'challenge',
+          message: 'Suspicious login detected. Use the OTP below for verification.',
+          userId: freshUser._id,
+          riskScore: req.riskScore,
+          expiresInMinutes: Number(process.env.OTP_EXPIRES_MINUTES || 30),
+          developmentOtp: otp,
+          emailError: 'Invalid email address in user record'
+        });
       }
 
-      return res.status(200).json({
-        status: 'challenge',
-        message: 'Suspicious login detected. An OTP has been sent to the registered email.',
-        userId: user._id,
-        riskScore: req.riskScore,
-        expiresInMinutes: Number(process.env.OTP_EXPIRES_MINUTES || 30)
-      });
+      try {
+        // Try to send email
+        await sendOtpEmail(freshUser.email, otp, freshUser.name);
+        console.log(`OTP sent successfully to ${freshUser.email}`);
+        
+        return res.status(200).json({
+          status: 'challenge',
+          message: 'Suspicious login detected. An OTP has been sent to your registered email.',
+          userId: freshUser._id,
+          riskScore: req.riskScore,
+          expiresInMinutes: Number(process.env.OTP_EXPIRES_MINUTES || 30)
+        });
+      } catch (emailError) {
+        console.error('Failed to send OTP email:', emailError);
+        
+        // For development, return OTP in response
+        return res.status(200).json({
+          status: 'challenge',
+          message: 'Suspicious login detected. Use the OTP below for verification.',
+          userId: freshUser._id,
+          riskScore: req.riskScore,
+          expiresInMinutes: Number(process.env.OTP_EXPIRES_MINUTES || 30),
+          developmentOtp: otp,
+          emailError: emailError.message
+        });
+      }
     } else {
       // Normal login: update device info and login history
       const fingerprint = makeFingerprintFromReq(req);
       const ip = getIpFromReq(req);
       const geo = ip ? require('geoip-lite').lookup(ip) || {} : {};
       
-      // Update trusted devices if this device is already trusted
-      const foundIndex = (user.trustedDevices || []).findIndex(d => d.fingerprint === fingerprint);
-      if (foundIndex !== -1) {
-        user.trustedDevices[foundIndex].lastSeen = new Date();
-      }
-      
-      // Add to login history
-      user.loginHistory = user.loginHistory || [];
-      user.loginHistory.push({
-        ip: ip,
-        country: geo.country || '',
-        city: geo.city || '',
-        device: req.headers['user-agent'] || '',
-        time: new Date(),
-        status: 'success',
-        riskScore: req.riskScore || 0
+      // Update user data
+      await User.findByIdAndUpdate(user._id, {
+        hasPendingAnomaly: false,
+        $push: {
+          loginHistory: {
+            ip: ip,
+            country: geo.country || '',
+            city: geo.city || '',
+            device: req.headers['user-agent'] || '',
+            time: new Date(),
+            status: 'success',
+            riskScore: req.riskScore || 0
+          }
+        }
       });
 
-      await user.save();
-
-      const token = signToken(user._id);
-      user.password = undefined;
-      user.otpHash = undefined;
-      user.otpExpires = undefined;
+      // Get fresh user data for response
+      const freshUser = await User.findById(user._id);
+      
+      const token = signToken(freshUser._id);
+      freshUser.password = undefined;
+      freshUser.otpHash = undefined;
+      freshUser.otpExpires = undefined;
       
       return res.status(200).json({ 
         status: 'success', 
         token, 
-        data: { user },
+        data: { user: freshUser },
         riskScore: req.riskScore || 0
       });
     }
   } catch (err) {
     console.error('Error in login final handler:', err);
+    
+    if (err.name === 'MongoServerError') {
+      return res.status(503).json({ status: 'fail', message: 'Database error. Please try again.' });
+    }
+    
     res.status(500).json({ status: 'fail', message: 'Server error' });
   }
 });
 
+
+
 // ---------- VERIFY OTP (issue token after success) ----------
 router.post('/verify-otp', async (req, res) => {
   try {
+    const connectionError = checkMongoConnection(res);
+    if (connectionError) return connectionError;
+
     const { userId, otp } = req.body;
     if (!userId || !otp) return res.status(400).json({ status: 'fail', message: 'userId and otp required' });
 
@@ -192,7 +318,7 @@ router.post('/verify-otp', async (req, res) => {
       lastLogin.status = 'verified';
     }
 
-    user.clearOtp();
+    user.clearOtp(); // This also clears hasPendingAnomaly
     await user.save();
 
     const token = signToken(user._id);
@@ -207,9 +333,12 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
-// Add a route to verify tokens
+// Add a route to verify tokens and check anomaly status
 router.get('/verify', async (req, res) => {
   try {
+    const connectionError = checkMongoConnection(res);
+    if (connectionError) return connectionError;
+
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
       return res.status(401).json({ status: 'fail', message: 'No token provided' });
@@ -222,10 +351,55 @@ router.get('/verify', async (req, res) => {
       return res.status(401).json({ status: 'fail', message: 'Invalid token' });
     }
 
-    res.status(200).json({ status: 'success', data: { user } });
+    res.status(200).json({ 
+      status: 'success', 
+      data: { user },
+      hasPendingAnomaly: user.hasPendingAnomaly
+    });
   } catch (err) {
     console.error('Token verification error:', err);
     res.status(401).json({ status: 'fail', message: 'Invalid token' });
+  }
+});
+
+// Add endpoint to get user risk history
+router.get('/risk-history', async (req, res) => {
+  try {
+    const connectionError = checkMongoConnection(res);
+    if (connectionError) return connectionError;
+
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ status: 'fail', message: 'No token provided' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    
+    if (!user) {
+      return res.status(401).json({ status: 'fail', message: 'Invalid token' });
+    }
+
+    // Get last 10 login attempts with risk scores
+    const riskHistory = user.loginHistory
+      .sort((a, b) => new Date(b.time) - new Date(a.time))
+      .slice(0, 10)
+      .map(login => ({
+        time: login.time,
+        riskScore: login.riskScore,
+        status: login.status,
+        ip: login.ip,
+        location: `${login.city}, ${login.country}`,
+        device: login.device
+      }));
+
+    res.status(200).json({ 
+      status: 'success', 
+      data: { riskHistory } 
+    });
+  } catch (err) {
+    console.error('Risk history error:', err);
+    res.status(500).json({ status: 'fail', message: 'Server error' });
   }
 });
 

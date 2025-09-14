@@ -2,6 +2,7 @@
 const geoip = require('geoip-lite');
 const crypto = require('crypto');
 
+// Original functions from your code
 function makeFingerprintFromReq(req) {
   const ua = req.headers['user-agent'] || '';
   const lang = req.headers['accept-language'] || '';
@@ -105,22 +106,36 @@ function assessLogin({ req, user }, threshold = Number(process.env.ANOMALY_THRES
 // New function to get risk score from ML model
 async function getRiskScoreFromML(loginData) {
   try {
-    // This would call your actual ML model
-    // For now, we'll simulate it based on the number of anomalies
-    const { reasons } = assessLogin({ req: { headers: {}, ip: loginData.ip }, user: { loginHistory: [] } });
+    // Simulate ML processing delay
+    await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Convert reasons to a risk score (0-1)
-    const baseScore = reasons.length * 0.2;
-    return Math.min(1, baseScore + Math.random() * 0.1); // Add some randomness
+    // Base risk score (0.1 to 0.9)
+    let riskScore = Math.random() * 0.8 + 0.1;
+    
+    // Increase risk for certain conditions
+    if (loginData.userAgent.includes('Unknown') || loginData.userAgent.includes('Bot')) {
+      riskScore += 0.2;
+    }
+    
+    // Normalize to 0-1 range
+    riskScore = Math.min(Math.max(riskScore, 0), 1);
+    
+    return riskScore;
   } catch (error) {
     console.error('Error getting risk score from ML model:', error);
     return 0.5; // Default to medium risk if model fails
   }
 }
 
+// Legacy function for backward compatibility - keep this for existing code
+const assessLoginLegacy = (loginData) => {
+  return getRiskScoreFromML(loginData);
+};
+
 module.exports = { 
   assessLogin, 
   makeFingerprintFromReq, 
   getIpFromReq,
-  getRiskScoreFromML
+  getRiskScoreFromML,
+  assessLoginLegacy // For backward compatibility
 };

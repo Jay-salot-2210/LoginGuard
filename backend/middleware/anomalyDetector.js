@@ -49,8 +49,8 @@ const anomalyDetector = async (req, res, next) => {
           message: 'Additional verification required due to suspicious login attempt'
         };
         
-        // Don't call next() - we'll handle the response in the controller
-        return;
+        // IMPORTANT: Call next() to continue to the final handler
+        next();
       }
     } else {
       next();
