@@ -150,7 +150,7 @@ const ProcessingAnimation: React.FC = () => {
             <div className="text-sm text-gray-400">Anomalies Detected</div>
           </div>
           <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-            <div className="text-2xl font-bold text-cyan-300">99.7%</div>
+            <div className="text-2xl font-bold text-cyan-300">97%</div>
             <div className="text-sm text-gray-400">Accuracy Rate</div>
           </div>
         </div>

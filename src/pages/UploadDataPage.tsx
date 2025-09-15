@@ -11,7 +11,7 @@ import UploadSection from '../components/UploadSection';
 import { AnalysisState, AnalysisResults } from '../types';
 
 const UploadDataPage: React.FC = () => {
-  const BASE_URL = "https://bb4aac07ee91.ngrok-free.app"; // Replace with your actual API URL
+  const BASE_URL = "https://2f109736df5e.ngrok-free.app"; // Replace with your actual API URL
   const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [results, setResults] = useState<AnalysisResults | null>(null);
@@ -19,7 +19,7 @@ const UploadDataPage: React.FC = () => {
 
   const handleFileUpload = (file: File) => {
     // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > 1024 * 1024 * 1024) {
       setErrorMessage('File size exceeds 10MB limit');
       return;
     }
@@ -55,7 +55,7 @@ const UploadDataPage: React.FC = () => {
         throw new Error('Authentication required. Please log in again.');
       }
 
-      const response = await fetch(`${BASE_URL}/predict`, {
+      const response = await fetch(`${BASE_URL}/predict_file`, {
         method: "POST",
         body: formData,
         headers: { 
@@ -220,7 +220,17 @@ const UploadDataPage: React.FC = () => {
             analysisState={analysisState}
             onRunAnalysis={handleRunAnalysis}
             errorMessage={errorMessage}
+            onReset={handleReset} 
           />
+          {/* Reset button */}
+              {/* <div className="text-center">
+                <button
+                  onClick={handleReset}
+                  className="px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Reset
+                </button>
+              </div> */}
 
           {/* Results Sections */}
           {results && analysisState === 'completed' && (
@@ -234,15 +244,6 @@ const UploadDataPage: React.FC = () => {
               <FlaggedUsersTable results={results} />
               <SecurityReport results={results} />
               
-              {/* Reset button */}
-              <div className="text-center">
-                <button
-                  onClick={handleReset}
-                  className="px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  Analyze Another File
-                </button>
-              </div>
             </motion.div>
           )}
         </motion.div>

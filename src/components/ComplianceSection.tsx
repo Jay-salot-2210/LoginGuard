@@ -93,7 +93,7 @@ const ComplianceSection: React.FC = () => {
         </div>
 
         {/* Compliance Benefits */}
-        <div className="bg-gradient-to-r from-teal-600/20 to-blue-600/20 rounded-2xl p-8 border border-teal-500/30">
+        {/* <div className="bg-gradient-to-r from-teal-600/20 to-blue-600/20 rounded-2xl p-8 border border-teal-500/30">
           <h3 className="text-2xl font-bold mb-6 text-center">Compliance Automation Benefits</h3>
           
           <div className="grid md:grid-cols-3 gap-6">
@@ -121,10 +121,10 @@ const ComplianceSection: React.FC = () => {
               <p className="text-gray-300 text-sm">Generate compliance reports with one click for auditors and regulators</p>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* CTA Section */}
-        <div className="text-center mt-12">
+        {/* <div className="text-center mt-12">
           <div className="bg-white/10 rounded-2xl p-8 border border-white/10">
             <h3 className="text-2xl font-bold mb-4">Ready for Enterprise Deployment</h3>
             <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
@@ -135,7 +135,7 @@ const ComplianceSection: React.FC = () => {
               Request Compliance Assessment
             </button>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );

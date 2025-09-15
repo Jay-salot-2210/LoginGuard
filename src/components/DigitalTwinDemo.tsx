@@ -39,7 +39,7 @@ const DigitalTwinDemo: React.FC = () => {
       {
         time: '00:00:02',
         location: 'Moscow, Russia',
-        user: 'admin@company.com',
+        user: 'rakesh.patel@acme-corp.com',
         status: 'blocked',
         description: 'Unusual geographic location - 3000+ miles from normal access pattern',
         ip: '192.168.1.105',
@@ -48,7 +48,7 @@ const DigitalTwinDemo: React.FC = () => {
       {
         time: '00:00:05',
         location: 'New York, USA',
-        user: 'jane.smith@company.com',
+        user: 'emily.clark@fintechlabs.io',
         status: 'attempting',
         description: 'Valid credentials but unusual time (2:00 AM local time)',
         ip: '104.28.245.63',
@@ -57,7 +57,7 @@ const DigitalTwinDemo: React.FC = () => {
       {
         time: '00:00:08',
         location: 'Tokyo, Japan',
-        user: 'admin@company.com',
+        user: 'li.wei@globaltech.co.uk',
         status: 'blocked',
         description: 'Impossible travel detected - Previous login 5 mins ago in London',
         ip: '210.140.10.1',
@@ -66,7 +66,7 @@ const DigitalTwinDemo: React.FC = () => {
       {
         time: '00:00:12',
         location: 'London, UK',
-        user: 'john.doe@company.com',
+        user: 'michael.brown@enterprise-solutions.com',
         status: 'detected',
         description: 'Multiple failed attempts followed by success - Potential credential stuffing',
         ip: '86.150.25.78',
@@ -75,7 +75,7 @@ const DigitalTwinDemo: React.FC = () => {
       {
         time: '00:00:15',
         location: 'Beijing, China',
-        user: 'service-account@company.com',
+        user: 'svc-billing@acme-corp.com',
         status: 'blocked',
         description: 'Service account accessing from unrecognized country - Flagged as high risk',
         ip: '118.144.82.9',
@@ -84,7 +84,7 @@ const DigitalTwinDemo: React.FC = () => {
       {
         time: '00:00:18',
         location: 'San Francisco, USA',
-        user: 'jane.smith@company.com',
+        user: 'emily.clark@fintechlabs.io',
         status: 'attempting',
         description: 'Valid login but from Tor network - Additional verification required',
         ip: '199.249.230.78',
@@ -292,7 +292,7 @@ const DigitalTwinDemo: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-800 mb-2">Behavioral Analysis</h4>
-                    <p className="text-gray-600">Machine learning models establish baseline behavior patterns for each user and flag anomalies in real-time with 99.8% accuracy</p>
+                    <p className="text-gray-600">Machine learning models establish baseline behavior patterns for each user and flag anomalies in real-time with 97% accuracy</p>
                   </div>
                 </div>
                 

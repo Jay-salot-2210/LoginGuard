@@ -431,8 +431,8 @@ const handleOtpVerify = async (userId: string, otp: string) => {
                 <h3 className="text-lg font-semibold mb-4 text-teal-300">Contact</h3>
                 <ul className="space-y-2 text-gray-400">
                   <li>Email: <a href="mailto:support@anomalyguard.ai" className="hover:text-white">support@anomalyguard.ai</a></li>
-                  <li>Phone: <a href="tel:+1234567890" className="hover:text-white">+1 (234) 567-890</a></li>
-                  <li>Location: Remote-first 🌍</li>
+                  <li>Phone: <a href="tel:+1234567890" className="hover:text-white">+91 9106375472</a></li>
+                  <li>Location: Ahmedabad</li>
                 </ul>
               </div>
             </div>

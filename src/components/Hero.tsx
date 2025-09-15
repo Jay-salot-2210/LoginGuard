@@ -75,7 +75,7 @@ const Hero: React.FC<HeroProps> = ({ scrollToSection, isAuthenticated }) => {
             
             <div className="flex items-center space-x-8 pt-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-teal-600">99.8%</div>
+                <div className="text-2xl font-bold text-teal-600">97%</div>
                 <div className="text-sm text-gray-600">Accuracy</div>
               </div>
               <div className="text-center">

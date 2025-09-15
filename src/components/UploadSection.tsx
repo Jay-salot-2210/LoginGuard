@@ -8,6 +8,7 @@ interface UploadSectionProps {
   analysisState: AnalysisState;
   onRunAnalysis: () => void;
   errorMessage?: string | null;
+  onReset: () => void;   // <-- Added Reset prop
 }
 
 const UploadSection: React.FC<UploadSectionProps> = ({
@@ -15,7 +16,8 @@ const UploadSection: React.FC<UploadSectionProps> = ({
   uploadedFile,
   analysisState,
   onRunAnalysis,
-  errorMessage
+  errorMessage,
+  onReset
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -119,6 +121,15 @@ const UploadSection: React.FC<UploadSectionProps> = ({
                       </div>
                     </div>
                   </div>
+                  {/* Reset button also available when file uploaded */}
+                  <div className="mt-4 text-center">
+                    <button
+                      onClick={onReset}
+                      className="px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors shadow"
+                    >
+                      Reset
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -131,13 +142,24 @@ const UploadSection: React.FC<UploadSectionProps> = ({
                     Drag and drop your files here
                   </h3>
                   <p className="text-gray-500 mb-4">or click to browse files</p>
-                  <button
-                    onClick={handleButtonClick}
-                    className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-medium rounded-lg
-                             hover:from-teal-600 hover:to-cyan-600 transition-all duration-200 shadow-lg hover:shadow-xl"
-                  >
-                    Choose File
-                  </button>
+
+                  {/* Upload + Reset buttons side by side */}
+                  <div className="flex items-center justify-center gap-4">
+                    <button
+                      onClick={handleButtonClick}
+                      className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-medium rounded-lg
+                               hover:from-teal-600 hover:to-cyan-600 transition-all duration-200 shadow-lg hover:shadow-xl"
+                    >
+                      Choose File
+                    </button>
+
+                    <button
+                      onClick={onReset}
+                      className="px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors shadow"
+                    >
+                      Reset
+                    </button>
+                  </div>
                 </div>
                 <p className="text-sm text-gray-400">Supports CSV and LOG files up to 10MB</p>
               </div>
